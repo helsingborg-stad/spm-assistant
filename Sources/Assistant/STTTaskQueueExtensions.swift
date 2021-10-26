@@ -34,7 +34,7 @@ public class STTTask : QueueTask {
         }
         var started:Bool = false
         service.mode = mode
-        service.statusPublisher.sink { [weak self] status in
+        service.$status.sink { [weak self] status in
             guard let this = self else {
                 return
             }

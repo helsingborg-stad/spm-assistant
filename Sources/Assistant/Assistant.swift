@@ -43,7 +43,11 @@ public class Assistant<Keys: NLKeyDefinition> : ObservableObject {
 
     @Published public var locale:Locale {
         didSet {
-            dragoman.locale = locale
+            if let language = locale.languageCode {
+                dragoman.language = language
+            } else {
+                debugPrint("unable to set dragoman language from \(locale)")
+            }
             stt.locale = locale
             commandBridge.locale = locale
         }
@@ -58,7 +62,7 @@ public class Assistant<Keys: NLKeyDefinition> : ObservableObject {
     public init(settings:Settings) {
         self.supportedLocales = settings.supportedLocales
         self.mainLocale = settings.mainLocale
-        self.dragoman = Dragoman(translationService:settings.translator, locale:settings.mainLocale, supportedLanguages: settings.supportedLocales.compactMap({$0.identifier}))
+        self.dragoman = Dragoman(translationService:settings.translator, language:settings.mainLocale.languageCode ?? "en", supportedLanguages: settings.supportedLocales.compactMap({$0.languageCode}))
         self.stt = STT(service: settings.sttService)
         self.tts = TTS(settings.ttsServices)
         
@@ -69,7 +73,7 @@ public class Assistant<Keys: NLKeyDefinition> : ObservableObject {
             self?.stt.contextualStrings = arr
         }.store(in: &publishers)
         
-        stt.resultPublisher.sink { [weak self] res in
+        stt.results.sink { [weak self] res in
             self?.sttStringPublisher.send(res.string)
         }.store(in: &publishers)
         
@@ -78,7 +82,7 @@ public class Assistant<Keys: NLKeyDefinition> : ObservableObject {
         }.store(in: &publishers)
         
         stt.locale = settings.mainLocale
-        dragoman.locale = settings.mainLocale
+        dragoman.language = settings.mainLocale.languageCode!
         commandBridge.locale = settings.mainLocale
     }
     private func string(for key:String) -> String {
@@ -164,8 +168,6 @@ public class Assistant<Keys: NLKeyDefinition> : ObservableObject {
             self.content = content
         }
         public var body: some View {
-            /// For the bundle updates
-            let dragoman = assistant.dragoman
             content()
                 .environmentObject(assistant)
                 .environmentObject(assistant.tts)
@@ -173,7 +175,6 @@ public class Assistant<Keys: NLKeyDefinition> : ObservableObject {
                 .environmentObject(assistant.taskQueue)
                 .environmentObject(assistant.dragoman)
                 .environment(\.locale, assistant.locale)
-                .environment(\.dragomanBundle, dragoman.bundle)
         }
     }
 }
