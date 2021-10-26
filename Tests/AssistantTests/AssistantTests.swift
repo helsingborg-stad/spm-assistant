@@ -1,11 +1,188 @@
-    import XCTest
-    @testable import Assistant
+import XCTest
+import Combine
+import TTS
+import STT
+import AudioSwitchboard
+import TextTranslator
+@testable import Assistant
 
-    final class AssistantTests: XCTestCase {
-        func testExample() {
-            // This is an example of a functional test case.
-            // Use XCTAssert and related functions to verify your tests produce the correct
-            // results.
-            //XCTAssertEqual(Assistant().text, "Hello, World!")
+enum VoiceCommands : String, NLKeyDefinition {
+    var description: String {
+        return self.rawValue
+    }
+    case leave
+    case home
+    case weather
+    case food
+    case calendar
+    case instagram
+}
+let firstTest = "test string 1"
+let firstTestTranslated = "test string 1 has been translated"
+
+let secondTest = "test string 2"
+let secondTestTranslated = "test string 2 has been translated"
+
+let supportedLocales = [Locale(identifier: "en_US"),Locale(identifier: "sv_SE")]
+
+class TestTextTranslator : TextTranslationService {
+    var translationDict = [String:String]()
+    init() {
+        translationDict[firstTest] = firstTestTranslated
+        translationDict[secondTest] = secondTestTranslated
+    }
+    func translate(_ texts: [TranslationKey : String], from: LanguageKey, to: [LanguageKey], storeIn table: TextTransaltionTable) -> FinishedPublisher {
+        let subj = FinishedSubject()
+        DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + 0.1) {
+            var table = table
+            for (key,_) in texts {
+                for l in to {
+                    if table.db[l] == nil {
+                        table.db[l] = [:]
+                    }
+                    if let val = self.translationDict[key] {
+                        table[l,key] = val
+                    } else {
+                        table[l,key] = "unknown key \(key)"
+                    }
+                }
+            }
+            subj.send(table)
+        }
+        return subj.eraseToAnyPublisher()
+    }
+    
+    func translate(_ texts: [String], from: LanguageKey, to: [LanguageKey], storeIn table: TextTransaltionTable) -> FinishedPublisher {
+        let subj = FinishedSubject()
+        DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + 0.1) {
+            var table = table
+            for key in texts {
+                for l in to {
+                    if let val = self.translationDict[key] {
+                        table[l,key] = val
+                    } else {
+                        table[l,key] = "unknown key \(key)"
+                    }
+                }
+            }
+            subj.send(table)
+        }
+        return subj.eraseToAnyPublisher()
+    }
+    
+    func translate(_ text: String, from: LanguageKey, to: LanguageKey) -> TranslatedPublisher {
+        let subj = TranslatedSubject()
+        DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + 1) {
+            subj.send(TranslatedString(language: to, key: text, value: "mock translation"))
+        }
+        return subj.eraseToAnyPublisher()
+    }
+}
+class TestSTT : STTService {
+    var locale: Locale = Locale(identifier: "en_US")
+    var contextualStrings: [String] = []
+    var mode: STTMode = .unspecified
+    var resultPublisher: STTRecognitionPublisher
+    var statusPublisher: STTStatusPublisher
+    var errorPublisher: STTErrorPublisher
+    var resultSubject = STTRecognitionSubject()
+    var statusSubject = STTStatusSubject()
+    var errorSubject = STTErrorSubject()
+    var available: Bool = true
+    var status:STTStatus = .idle {
+        didSet {
+            self.statusSubject.send(status)
         }
     }
+    func start() {
+        self.status = .recording
+    }
+    
+    func stop() {
+        self.status = .idle
+    }
+    func send(_ text:String) {
+        if self.status == .recording {
+            self.resultSubject.send(STTResult(text, confidence: 100, locale: self.locale))
+        }
+    }
+    func done() {
+        self.stop()
+    }
+    init() {
+        resultPublisher = resultSubject.eraseToAnyPublisher()
+        statusPublisher = statusSubject.eraseToAnyPublisher()
+        errorPublisher = errorSubject.eraseToAnyPublisher()
+    }
+    
+}
+func createDB() -> TestParser.DB {
+    var db = TestParser.DB()
+    let commands = [
+        VoiceCommands.leave:["back","backwards"],
+        VoiceCommands.home:["home"],
+        VoiceCommands.weather:["weather","rain"],
+        VoiceCommands.food:["food","hungry"],
+        VoiceCommands.calendar:["calendar","today"],
+        VoiceCommands.instagram:["instagram"]
+    ]
+    for l in supportedLocales {
+        db[l] = commands
+    }
+    return db
+}
+var switchboard = AudioSwitchboard()
+var cancellabels = Set<AnyCancellable>()
+typealias TestParser = NLParser<VoiceCommands>
+typealias MyAssistant = Assistant<VoiceCommands>
+final class AssistantTests: XCTestCase {
+    func testNLParser() {
+        let locale = Locale(identifier:"en_US")
+        let db = createDB()
+        let pub = PassthroughSubject<String,Never>()
+        var shouldhit = VoiceCommands.allCases
+        let nlparser = TestParser(languages: [locale], db: db, stringPublisher: pub.eraseToAnyPublisher())
+        nlparser.publisher(using: VoiceCommands.allCases).sink { result in
+            for v in VoiceCommands.allCases {
+                if result.contains(v) {
+                    shouldhit.removeAll { $0 == v }
+                }
+            }
+        }.store(in: &cancellabels)
+        pub.send("back")
+        pub.send("home")
+        pub.send("weather")
+        pub.send("hungry")
+        pub.send("today")
+        XCTAssert(shouldhit.count == 1)
+    }
+    func testAssistant() {
+        let sttService = TestSTT()
+        var shouldhit = VoiceCommands.allCases
+        let assistant = MyAssistant(
+            settings: .init(
+                sttService: sttService,
+                ttsServices: AppleTTS(audioSwitchBoard: switchboard),
+                supportedLocales: [Locale(identifier: "en_US"),Locale(identifier: "sv_SE")],
+                translator: TestTextTranslator(),
+                voiceCommands: createDB()
+            )
+        )
+        assistant.listen(for: VoiceCommands.allCases).sink { result in
+            debugPrint(result)
+            for v in VoiceCommands.allCases {
+                if result.contains(v) {
+                    shouldhit.removeAll { $0 == v }
+                }
+            }
+        }.store(in: &cancellabels)
+        sttService.send("back")
+        sttService.send("home")
+        sttService.send("weather")
+        sttService.send("hungry")
+        sttService.send("today")
+        Timer.scheduledTimer(withTimeInterval: 1, repeats: false) { timer in
+            XCTAssert(shouldhit.count == 1)
+        }
+    }
+}
