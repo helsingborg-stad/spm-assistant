@@ -10,13 +10,22 @@ import Dragoman
 import AudioSwitchboard
 
 public class Assistant<Keys: NLKeyDefinition> : ObservableObject {
+    public typealias CommandBridge = NLParser<Keys>
     public struct Settings {
         public let sttService: STTService
         public let ttsServices: [TTSService]
         public let supportedLocales:[Locale]
         public let mainLocale:Locale
+        public let voiceCommands:CommandBridge.DB
         public let translator:TextTranslationService?
-        public init(sttService: STTService, ttsServices: TTSService..., supportedLocales:[Locale], mainLocale:Locale? = nil , translator:TextTranslationService? = nil) {
+        public init(
+            sttService: STTService,
+            ttsServices: TTSService...,
+            supportedLocales:[Locale],
+            mainLocale:Locale? = nil,
+            translator:TextTranslationService? = nil,
+            voiceCommands:CommandBridge.DB? = nil
+        ) {
             var supportedLocales = supportedLocales
             if supportedLocales.count == 0 {
                 supportedLocales = [Locale.current]
@@ -26,9 +35,10 @@ public class Assistant<Keys: NLKeyDefinition> : ObservableObject {
             self.supportedLocales = supportedLocales
             self.mainLocale = mainLocale ?? supportedLocales.first ?? Locale.current
             self.translator = translator
+            self.voiceCommands = voiceCommands ?? Keys.createLocalizedDatabasePlist(languages: supportedLocales)
         }
     }
-    public typealias CommandBridge = NLParser<Keys>
+
     
     private let sttStringPublisher = PassthroughSubject<String,Never>()
     private var publishers = Set<AnyCancellable>()
@@ -67,8 +77,12 @@ public class Assistant<Keys: NLKeyDefinition> : ObservableObject {
         self.tts = TTS(settings.ttsServices)
         
         self.locale = settings.mainLocale
-        commandBridge = CommandBridge(languages: supportedLocales, stringPublisher: sttStringPublisher.eraseToAnyPublisher())
-        
+        commandBridge = CommandBridge(
+            languages: supportedLocales,
+            db: settings.voiceCommands,
+            stringPublisher: sttStringPublisher.eraseToAnyPublisher()
+        )
+        commandBridge.locale = settings.mainLocale
         commandBridge.$contextualStrings.sink { [weak self] arr in
             self?.stt.contextualStrings = arr
         }.store(in: &publishers)
@@ -84,6 +98,7 @@ public class Assistant<Keys: NLKeyDefinition> : ObservableObject {
         stt.locale = settings.mainLocale
         dragoman.language = settings.mainLocale.languageCode!
         commandBridge.locale = settings.mainLocale
+        taskQueue.queue(.unspecified, using: stt)
     }
     private func string(for key:String) -> String {
         return dragoman.string(forKey: key)

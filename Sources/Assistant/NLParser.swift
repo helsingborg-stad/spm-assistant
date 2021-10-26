@@ -9,9 +9,52 @@ import Foundation
 import STT
 import Combine
 
-public typealias NLKeyDefinition = CustomStringConvertible & Hashable & CaseIterable & Equatable
+
+public protocol NLKeyDefinition : CustomStringConvertible & Hashable & CaseIterable & Equatable {
+    
+}
+public extension NLKeyDefinition {
+    static func createLocalizedDatabasePlist(fileName:String = "VoiceCommands", languages:[Locale]) -> NLParser<Self>.DB {
+        var propertyListFormat = PropertyListSerialization.PropertyListFormat.xml
+        var db = NLParser<Self>.DB()
+        func bundle(for language:Locale) -> Bundle {
+            guard let b = Bundle.main.path(forResource: language.identifier, ofType: "lproj") else {
+                return Bundle.main
+            }
+            return Bundle(path: b) ?? Bundle.main
+        }
+        for lang in languages {
+            db[lang] = [Self:[String]]()
+            let bundle = bundle(for: lang)
+            guard let path = bundle.path(forResource: fileName, ofType: "plist") else {
+                print("no path for \(lang) in \(bundle.bundlePath)")
+                continue
+            }
+            do {
+                guard let plistXML = FileManager.default.contents(atPath: path) else {
+                    continue
+                }
+                let data = try PropertyListSerialization.propertyList(from: plistXML, options: .mutableContainersAndLeaves, format: &propertyListFormat)
+                guard let abc = data as? [String:[String]] else {
+                    continue
+                }
+                var dict = NLParser<Self>.Entity()
+                Self.allCases.forEach { key in
+                    if let arr = abc[key.description] {
+                        dict[key] = arr
+                    }
+                }
+                db[lang] = dict
+            } catch {
+                print(error)
+                continue
+            }
+        }
+        return db
+    }
+}
 public class NLParser<Key: NLKeyDefinition> : ObservableObject {
-    typealias DB = [Locale:Entity]
+    public typealias DB = [Locale:Entity]
     
     public typealias Entity = [Key:[String]]
     public typealias ResultPublisher = AnyPublisher<Result,Never>
@@ -33,8 +76,14 @@ public class NLParser<Key: NLKeyDefinition> : ObservableObject {
     }
     @Published public private(set) var contextualStrings:[String] = []
     
-    init(languages:[Locale], fileName: String = "VoiceCommands", stringPublisher:AnyPublisher<String,Never>) {
-        db = Self.createLocalizedDatabasePlist(fileName:fileName, languages: languages)
+    init(languages:[Locale], db:DB, stringPublisher:AnyPublisher<String,Never>) {
+        self.db = db
+        self.locale = languages.first ?? .current
+        self.stringPublisher = stringPublisher
+        updateContextualStrings()
+    }
+    init(languages:[Locale], fileName: String, stringPublisher:AnyPublisher<String,Never>) {
+        db = Key.createLocalizedDatabasePlist(fileName:fileName, languages: languages)
         self.locale = languages.first ?? .current
         self.stringPublisher = stringPublisher
         updateContextualStrings()
@@ -71,42 +120,5 @@ public class NLParser<Key: NLKeyDefinition> : ObservableObject {
             return Result(collection: set)
         }.eraseToAnyPublisher()
     }
-    fileprivate static func createLocalizedDatabasePlist(fileName:String, languages:[Locale]) -> DB {
-        var propertyListFormat = PropertyListSerialization.PropertyListFormat.xml
-        var db = DB()
-        func bundle(for language:Locale) -> Bundle {
-            guard let b = Bundle.main.path(forResource: language.identifier, ofType: "lproj") else {
-                return Bundle.main
-            }
-            return Bundle(path: b) ?? Bundle.main
-        }
-        for lang in languages {
-            db[lang] = [Key:[String]]()
-            let bundle = bundle(for: lang)
-            guard let path = bundle.path(forResource: fileName, ofType: "plist") else {
-                print("no path for \(lang) in \(bundle.bundlePath)")
-                continue
-            }
-            do {
-                guard let plistXML = FileManager.default.contents(atPath: path) else {
-                    continue
-                }
-                let data = try PropertyListSerialization.propertyList(from: plistXML, options: .mutableContainersAndLeaves, format: &propertyListFormat)
-                guard let abc = data as? [String:[String]] else {
-                    continue
-                }
-                var dict = Entity()
-                Key.allCases.forEach { key in
-                    if let arr = abc[key.description] {
-                        dict[key] = arr
-                    }
-                }
-                db[lang] = dict
-            } catch {
-                print(error)
-                continue
-            }
-        }
-        return db
-    }
+
 }
