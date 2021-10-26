@@ -18,7 +18,8 @@ public extension NLKeyDefinition {
         var propertyListFormat = PropertyListSerialization.PropertyListFormat.xml
         var db = NLParser<Self>.DB()
         func bundle(for language:Locale) -> Bundle {
-            guard let b = Bundle.main.path(forResource: language.identifier, ofType: "lproj") else {
+            let language = language.languageCode ?? language.identifier
+            guard let b = Bundle.main.path(forResource: language, ofType: "lproj") else {
                 return Bundle.main
             }
             return Bundle(path: b) ?? Bundle.main
