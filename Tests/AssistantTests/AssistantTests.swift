@@ -31,7 +31,7 @@ class TestTextTranslator : TextTranslationService {
         translationDict[firstTest] = firstTestTranslated
         translationDict[secondTest] = secondTestTranslated
     }
-    func translate(_ texts: [TranslationKey : String], from: LanguageKey, to: [LanguageKey], storeIn table: TextTransaltionTable) -> FinishedPublisher {
+    func translate(_ texts: [TranslationKey : String], from: LanguageKey, to: [LanguageKey], storeIn table: TextTranslationTable) -> FinishedPublisher {
         let subj = FinishedSubject()
         DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + 0.1) {
             var table = table
@@ -41,9 +41,9 @@ class TestTextTranslator : TextTranslationService {
                         table.db[l] = [:]
                     }
                     if let val = self.translationDict[key] {
-                        table[l,key] = val
+                        table.set(value: val, for: key, in: l)
                     } else {
-                        table[l,key] = "unknown key \(key)"
+                        table.set(value: "unknown key \(key)", for: key, in: l)
                     }
                 }
             }
@@ -52,16 +52,16 @@ class TestTextTranslator : TextTranslationService {
         return subj.eraseToAnyPublisher()
     }
     
-    func translate(_ texts: [String], from: LanguageKey, to: [LanguageKey], storeIn table: TextTransaltionTable) -> FinishedPublisher {
+    func translate(_ texts: [String], from: LanguageKey, to: [LanguageKey], storeIn table: TextTranslationTable) -> FinishedPublisher {
         let subj = FinishedSubject()
         DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + 0.1) {
             var table = table
             for key in texts {
                 for l in to {
                     if let val = self.translationDict[key] {
-                        table[l,key] = val
+                        table.set(value: val, for: key, in: l)
                     } else {
-                        table[l,key] = "unknown key \(key)"
+                        table.set(value: "unknown key \(key)", for: key, in: l)
                     }
                 }
             }
@@ -122,7 +122,7 @@ func createDB() -> TestParser.DB {
         VoiceCommands.leave:["back","backwards"],
         VoiceCommands.home:["home"],
         VoiceCommands.weather:["weather","rain"],
-        VoiceCommands.food:["food","hungry"],
+        VoiceCommands.food:["food","i am hungry"],
         VoiceCommands.calendar:["calendar","today"],
         VoiceCommands.instagram:["instagram"]
     ]
@@ -151,12 +151,16 @@ final class AssistantTests: XCTestCase {
         }.store(in: &cancellabels)
         pub.send("back")
         pub.send("home")
-        pub.send("weather")
-        pub.send("hungry")
+        pub.send("weathermap")
+        pub.send("i am hungry")
         pub.send("today")
-        XCTAssert(shouldhit.count == 1)
+        
+        XCTAssertFalse(shouldhit.contains(.food))
+        XCTAssert(shouldhit.contains(.weather))
+        XCTAssert(shouldhit.contains(.instagram))
     }
     func testAssistant() {
+        let expectation = XCTestExpectation(description: "testDragoman")
         let sttService = TestSTT()
         var shouldhit = VoiceCommands.allCases
         let assistant = MyAssistant(
@@ -178,11 +182,16 @@ final class AssistantTests: XCTestCase {
         }.store(in: &cancellabels)
         sttService.send("back")
         sttService.send("home")
-        sttService.send("weather")
-        sttService.send("hungry")
+        sttService.send("weathermap")
+        sttService.send("i am hungry")
         sttService.send("today")
         Timer.scheduledTimer(withTimeInterval: 1, repeats: false) { timer in
-            XCTAssert(shouldhit.count == 1)
+            debugPrint(shouldhit)
+            XCTAssertFalse(shouldhit.contains(.food))
+            XCTAssert(shouldhit.contains(.weather))
+            XCTAssert(shouldhit.contains(.instagram))
+            expectation.fulfill()
         }
+        wait(for: [expectation], timeout: 5)
     }
 }

@@ -112,10 +112,10 @@ public class NLParser<Key: NLKeyDefinition> : ObservableObject {
                 return Result(collection: Set([]))
             }
             var set = Set<Entity>()
-            collection.forEach { a in
-                let values = a.value.filter({ $0.range(of: "\\b\(string)", options: [.regularExpression,.caseInsensitive]) != nil})
+            for dict in collection {
+                let values = dict.value.filter({ string.range(of: "\\b\($0)\\b", options: [.regularExpression,.caseInsensitive]) != nil})
                 if !values.isEmpty {
-                    set.insert([a.key:values])
+                    set.insert([dict.key:values])
                 }
             }
             return Result(collection: set)
