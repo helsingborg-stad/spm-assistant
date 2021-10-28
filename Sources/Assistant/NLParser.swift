@@ -10,10 +10,13 @@ import STT
 import Combine
 
 
+/// Protocol used to define a set if keys used for find a set of values in a string
 public protocol NLKeyDefinition : CustomStringConvertible & Hashable & CaseIterable & Equatable {
-    
 }
+/// Defualt implementation of the `createLocalizedDatabasePlist` method
 public extension NLKeyDefinition {
+    /// Creates a `Database` from a plist file for a set of languages.
+    /// - Returns: a generated database
     static func createLocalizedDatabasePlist(fileName:String = "VoiceCommands", languages:[Locale]) -> NLParser<Self>.DB {
         var propertyListFormat = PropertyListSerialization.PropertyListFormat.xml
         var db = NLParser<Self>.DB()
@@ -54,41 +57,67 @@ public extension NLKeyDefinition {
         return db
     }
 }
+/// Natural lanugage string parser
 public class NLParser<Key: NLKeyDefinition> : ObservableObject {
+    /// A dictionary type describing the NLParser database (entities associated with a locale)
     public typealias DB = [Locale:Entity]
     
+    /// A dictionary type describing key -> values (values/strings associated with a key)
     public typealias Entity = [Key:[String]]
+    /// Publishes events for when a value is found in a string.
     public typealias ResultPublisher = AnyPublisher<Result,Never>
     
+    /// Result object used for publishing parser results
     public struct Result {
+        /// The collection of entities found in a provided string
         public let collection:Set<Entity>
+        /// String used for parsing (ie originating string)
+        public let string:String
+        /// Searches the collection for keys
+        /// - Parameter key: the key to search for
+        /// - Returns: true if found, false if not
         public func contains(_ key : Key) -> Bool {
             collection.contains { db in
                 db.keys.contains(key)
             }
         }
     }
+    /// The database containing languages, keys and values
     private var db: DB
+    /// Publisher used to trigger the parser to search and publish results
     private var stringPublisher:AnyPublisher<String,Never>
+    /// The current locale, will trigger a change in contextual strings
     @Published public var locale:Locale = Locale.current {
         didSet {
             updateContextualStrings()
         }
     }
+    /// A set of strings derived from the database and the current locale. The strings can be used to improve the accuracy of an STT
     @Published public private(set) var contextualStrings:[String] = []
     
-    init(languages:[Locale], db:DB, stringPublisher:AnyPublisher<String,Never>) {
+    /// Initializes a new instance
+    /// - Parameters:
+    ///   - locale: The current locale (defaults to  Locale.current)
+    ///   - db: The database containing languages, keys and values
+    ///   - stringPublisher: Publisher used to trigger the parser to search and publish results
+    init(locale:Locale = .current, db:DB, stringPublisher:AnyPublisher<String,Never>) {
         self.db = db
-        self.locale = languages.first ?? .current
+        self.locale = locale
         self.stringPublisher = stringPublisher
         updateContextualStrings()
     }
+    /// Initializes a new instance by reading from a `Bundle.main` plist file
+    /// - Parameters:
+    ///   - languages: The set of languages to populate the database with
+    ///   - fileName: The name of plist file
+    ///   - stringPublisher: Publisher used to trigger the parser to search and publish results
     init(languages:[Locale], fileName: String, stringPublisher:AnyPublisher<String,Never>) {
         db = Key.createLocalizedDatabasePlist(fileName:fileName, languages: languages)
         self.locale = languages.first ?? .current
         self.stringPublisher = stringPublisher
         updateContextualStrings()
     }
+    /// Updates the contextual strings based on the current locale
     func updateContextualStrings() {
         var str = [String]()
         guard let dict = db[locale] else {
@@ -101,15 +130,18 @@ public class NLParser<Key: NLKeyDefinition> : ObservableObject {
         })
         self.contextualStrings = str
     }
+    /// Publishes results parsed from the `stringPublisher`
+    /// - Parameter keys: The keys to use for parsing
+    /// - Returns: A result publisher
     func publisher(using keys:[Key]) -> ResultPublisher {
         return stringPublisher.map { [weak self] string -> Result in
             guard let this = self else {
-                return Result(collection: Set([]))
+                return Result(collection: Set([]), string:string)
             }
             guard let collection = this.db[this.locale]?.filter({ key,value in
                 return keys.contains(key)
             }) else {
-                return Result(collection: Set([]))
+                return Result(collection: Set([]), string:string)
             }
             var set = Set<Entity>()
             for dict in collection {
@@ -118,7 +150,7 @@ public class NLParser<Key: NLKeyDefinition> : ObservableObject {
                     set.insert([dict.key:values])
                 }
             }
-            return Result(collection: set)
+            return Result(collection: set, string:string)
         }.eraseToAnyPublisher()
     }
 

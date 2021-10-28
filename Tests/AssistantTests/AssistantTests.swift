@@ -141,7 +141,7 @@ final class AssistantTests: XCTestCase {
         let db = createDB()
         let pub = PassthroughSubject<String,Never>()
         var shouldhit = VoiceCommands.allCases
-        let nlparser = TestParser(languages: [locale], db: db, stringPublisher: pub.eraseToAnyPublisher())
+        let nlparser = TestParser(locale: locale, db: db, stringPublisher: pub.eraseToAnyPublisher())
         nlparser.publisher(using: VoiceCommands.allCases).sink { result in
             for v in VoiceCommands.allCases {
                 if result.contains(v) {

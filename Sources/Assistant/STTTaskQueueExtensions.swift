@@ -9,16 +9,27 @@ import Foundation
 import Combine
 import STT
 
+/// An implementation of `QueueTask` for the `STT`
+/// - Warning: Once the task has been completed, it cannot be reused.
 public class STTTask : QueueTask {
     public let id = UUID()
+    /// Subject used for ending the task
     let endSubject = PassthroughSubject<Void, Never>()
     public var end:AnyPublisher<Void,Never> {
         return endSubject.eraseToAnyPublisher()
     }
+    /// An instance of the STT used by the task
     weak var service: STT?
-    private var mode:STTMode
-    private var publishers = Set<AnyCancellable>()
+    /// The mode to be used when staring the task
+    private let mode:STTMode
+    /// Cancellables store
+    private var cancellables = Set<AnyCancellable>()
+    /// Indicates whether or not the task has been paused
     private var paused = false
+    /// Instansiated a new `STTTask`
+    /// - Parameters:
+    ///   - service: the `STT`
+    ///   - mode: the mode to be used when starting the task
     public init(service:STT, mode:STTMode = .unspecified) {
         self.service = service
         self.mode = mode
@@ -45,7 +56,7 @@ public class STTTask : QueueTask {
             } else {
                 started = true
             }
-        }.store(in: &publishers)
+        }.store(in: &cancellables)
         service.start()
     }
     public func interrupt() {
@@ -59,26 +70,44 @@ public class STTTask : QueueTask {
         paused = false
         service?.start()
     }
+    /// Used to tear down the instance. Stops the STT and publishes the `end` event.
+    /// - Warning: The instance cannot be reused after this method has been called
     func tearDown() {
         endSubject.send()
         endSubject.send(completion: .finished)
         service?.stop()
         service = nil
-        publishers.removeAll()
+        cancellables.removeAll()
     }
 }
+
 public extension STT {
+    /// Creates a new `STTTask` using the underlying `STT`
+    /// - Parameter mode: the `STTMode` to use for the task
+    /// - Returns: an instance of a STTTask
     func task(with mode:STTMode = .unspecified) -> STTTask {
         return STTTask(service: self, mode: mode)
     }
 }
 public extension TaskQueue {
+    /// Queue a `STTtask` with the provided properties
+    /// - Parameters:
+    ///   - mode: The mode to use when starting the task
+    ///   - stt: The stt instance to use
     func queue(_ mode:STTMode = .unspecified, using stt:STT) {
         queue(STTTask(service: stt, mode: mode))
     }
+    /// Interrupt the queue with an `STTtask` using the provided properties. More information in can be found in the documentation of `TaskQueue.interrupt`
+    /// - Parameters:
+    ///   - mode: The mode to use when starting the task
+    ///   - stt: The stt instance to use
     func interrupt(with mode:STTMode = .unspecified, using stt:STT) {
         interrupt(with: STTTask(service: stt, mode: mode))
     }
+    /// Interject the queue with an `STTtask` using the provided properties. More information in can be found in the documentation of `TaskQueue.interject`
+    /// - Parameters:
+    ///   - mode: The mode to use when starting the task
+    ///   - stt: The stt instance to use
     func interject(with mode:STTMode = .unspecified, using stt:STT) {
         interject(with: STTTask(service: stt, mode: mode))
     }
