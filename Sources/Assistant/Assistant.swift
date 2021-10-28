@@ -150,7 +150,7 @@ public class Assistant<Keys: NLKeyDefinition> : ObservableObject {
     ///   - locale: optional locale from the supportedLanguages. `self.locale` will be used if nil
     ///   - value: an optional default value used if the key is missing a localized value
     /// - Returns: the localized string
-    private func string(for key:String, in locale:Locale? = nil, value:String? = nil) -> String {
+    public func string(forKey key:String, in locale:Locale? = nil, value:String? = nil) -> String {
         guard let languageKey = locale?.languageCode else {
             return dragoman.string(forKey: key, value: value)
         }
@@ -165,7 +165,7 @@ public class Assistant<Keys: NLKeyDefinition> : ObservableObject {
     /// - Returns: an utterance configured with provided values
     private func utterance(for key:String, in locale:Locale? = nil, value:String? = nil, tag:String? = nil) -> TTSUtterance {
         let locale = locale ?? self.locale
-        return TTSUtterance(self.string(for: key,in:locale ,value: value), locale: locale, tag: tag)
+        return TTSUtterance(self.string(forKey: key,in:locale ,value: value), locale: locale, tag: tag)
     }
     // MARK: Task Queue
     /// Interrupt other tasks with a set of utterances
