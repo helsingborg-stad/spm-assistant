@@ -12,10 +12,10 @@ let package = Package(
             targets: ["Assistant"]),
     ],
     dependencies: [
-        .package(name: "TTS", url: "https://github.com/helsingborg-stad/spm-tts.git", from: "0.2.0"),
-        .package(name: "STT", url: "https://github.com/helsingborg-stad/spm-stt.git", from: "0.2.1"),
-        .package(name: "TextTranslator", url: "https://github.com/helsingborg-stad/spm-text-translator", from: "0.2.0"),
-        .package(name: "Dragoman", url: "https://github.com/helsingborg-stad/spm-dragoman.git", from: "0.1.4")
+        .package(name: "TTS", url: "https://github.com/helsingborg-stad/spm-tts.git", from: "0.2.2"),
+        .package(name: "STT", url: "https://github.com/helsingborg-stad/spm-stt.git", from: "0.2.3"),
+        .package(name: "TextTranslator", url: "https://github.com/helsingborg-stad/spm-text-translator", from: "0.2.1"),
+        .package(name: "Dragoman", url: "https://github.com/helsingborg-stad/spm-dragoman.git", from: "0.1.9")
     ],
     targets: [
         .target(
