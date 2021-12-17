@@ -183,7 +183,7 @@ final class AssistantTests: XCTestCase {
         sttService.send("back")
         sttService.send("home")
         sttService.send("weathermap")
-        sttService.send("i am hungry")
+        sttService.send("hey i am hungry now")
         sttService.send("today")
         Timer.scheduledTimer(withTimeInterval: 1, repeats: false) { timer in
             debugPrint(shouldhit)
