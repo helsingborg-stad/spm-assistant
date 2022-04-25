@@ -163,7 +163,7 @@ public class Assistant<Keys: NLKeyDefinition> : ObservableObject {
     ///   - value: an optional default value used if the key is missing a localized value
     ///   - tag: an optional value used to tag the utterance
     /// - Returns: an utterance configured with provided values
-    private func utterance(for key:String, in locale:Locale? = nil, value:String? = nil, tag:String? = nil) -> TTSUtterance {
+    public func utterance(for key:String, in locale:Locale? = nil, value:String? = nil, tag:String? = nil) -> TTSUtterance {
         let locale = locale ?? self.locale
         return TTSUtterance(self.string(forKey: key,in:locale ,value: value), locale: locale, tag: tag)
     }
