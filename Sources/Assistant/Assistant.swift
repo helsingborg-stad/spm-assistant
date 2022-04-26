@@ -227,6 +227,15 @@ public class Assistant<Keys: NLKeyDefinition> : ObservableObject {
     ///   - interrupt: indicates whether or not to interrupt or queue the utterances
     /// - Returns: a set of utterances representing the provided values
     @discardableResult public func speak(_ values:(UtteranceString,UtteranceTag?)..., interrupt:Bool = true) -> [TTSUtterance] {
+        return speak(values,interrupt: interrupt)
+    }
+    /// Adds a set of strings (and tags) to be uttered by the TTS
+    /// assistant.speak(("Hello User", "mytag"),("How are you?",nil), interrupt:true)
+    /// - Parameters:
+    ///   - values: touple representing a string and a tag
+    ///   - interrupt: indicates whether or not to interrupt or queue the utterances
+    /// - Returns: a set of utterances representing the provided values
+    @discardableResult public func speak(_ values:[(UtteranceString,UtteranceTag?)], interrupt:Bool = true) -> [TTSUtterance] {
         var arr = [TTSUtterance]()
         for value in values {
             arr.append(self.utterance(for: value.0, tag: value.1))
@@ -246,6 +255,15 @@ public class Assistant<Keys: NLKeyDefinition> : ObservableObject {
     ///   - interrupt: indicates whether or not to interrupt or queue the utterances
     /// - Returns: a set of utterances representing the provided values
     @discardableResult public func speak(_ strings:String..., interrupt:Bool = true) -> [TTSUtterance] {
+        return speak(strings,interrupt: interrupt)
+    }
+    /// Adds a set of strings to be uttered by the TTS
+    /// assistant.speak("Hello User","How are you?", interrupt:true)
+    /// - Parameters:
+    ///   - values: string to use for the utterance, using the current locale set in assistant
+    ///   - interrupt: indicates whether or not to interrupt or queue the utterances
+    /// - Returns: a set of utterances representing the provided values
+    @discardableResult public func speak(_ strings:[String], interrupt:Bool = true) -> [TTSUtterance] {
         var arr = [TTSUtterance]()
         for string in strings {
             arr.append(self.utterance(for: string))
