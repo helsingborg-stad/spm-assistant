@@ -245,7 +245,6 @@ public class Assistant<Keys: NLKeyDefinition> : ObservableObject {
         } else {
             self.queue(utterances: arr)
         }
-        self.speak(("Hello User", "greeting"),("How are you?",nil))
         return arr
     }
     /// Adds a set of strings to be uttered by the TTS
