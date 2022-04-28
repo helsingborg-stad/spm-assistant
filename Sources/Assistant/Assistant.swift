@@ -111,16 +111,22 @@ public class Assistant<Keys: NLKeyDefinition> : ObservableObject {
             stt.disabled = disabled
         }
     }
+    /// Indicates whether or not the tts is currently playing an utterance
     @Published public private(set) var isSpeaking:Bool = false
+    /// The currently playing tts utterance
     @Published public private(set) var currentlySpeaking:TTSUtterance? = nil
+    /// The current dragoman translaton bundle based ont the selected language
     @Published public private(set) var translationBundle:Bundle
     
+    /// Exposes a publisher for the $isSpeaking property
     public var isSpeakingPublisher:AnyPublisher<Bool,Never> {
         $isSpeaking.eraseToAnyPublisher()
     }
+    /// Exposes a publisher for the $currentlySpeaking property
     public var currentlySpeakingPublisher:AnyPublisher<TTSUtterance?,Never> {
         $currentlySpeaking.eraseToAnyPublisher()
     }
+    /// Exposes a publisher for the $translationBundle property
     public var translationBundlePublisher:AnyPublisher<Bundle,Never> {
         $translationBundle.eraseToAnyPublisher()
     }
