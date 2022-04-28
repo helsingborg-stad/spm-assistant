@@ -111,6 +111,19 @@ public class Assistant<Keys: NLKeyDefinition> : ObservableObject {
             stt.disabled = disabled
         }
     }
+    @Published public private(set) var isSpeaking:Bool = false
+    @Published public private(set) var currentlySpeaking:TTSUtterance? = nil
+    @Published public private(set) var translationBundle:Bundle
+    
+    public var isSpeakingPublisher:AnyPublisher<Bool,Never> {
+        $isSpeaking.eraseToAnyPublisher()
+    }
+    public var currentlySpeakingPublisher:AnyPublisher<TTSUtterance?,Never> {
+        $currentlySpeaking.eraseToAnyPublisher()
+    }
+    public var translationBundlePublisher:AnyPublisher<Bundle,Never> {
+        $translationBundle.eraseToAnyPublisher()
+    }
     /// Initialize a new instans with the provided settings
     /// - Parameter settings: settings to be used
     public init(settings:Settings) {
@@ -119,8 +132,9 @@ public class Assistant<Keys: NLKeyDefinition> : ObservableObject {
         self.dragoman = Dragoman(translationService:settings.translator, language:settings.mainLocale.languageCode ?? "en", supportedLanguages: settings.supportedLocales.compactMap({$0.languageCode}))
         self.stt = STT(service: settings.sttService)
         self.tts = TTS(settings.ttsServices)
-        
+        self.translationBundle = dragoman.bundle
         self.locale = settings.mainLocale
+        
         commandBridge = CommandBridge(
             locale: mainLocale,
             db: settings.voiceCommands,
@@ -135,8 +149,16 @@ public class Assistant<Keys: NLKeyDefinition> : ObservableObject {
             self?.sttStringPublisher.send(res.string)
         }.store(in: &cancellables)
         
-        dragoman.objectWillChange.sink {
-            self.objectWillChange.send()
+        dragoman.$bundle.receive(on: DispatchQueue.main).sink { [weak self] bundle in
+            self?.translationBundle = bundle
+        }.store(in: &cancellables)
+        
+        tts.$currentlySpeaking.sink { [weak self] utterance in
+            self?.currentlySpeaking = utterance
+        }.store(in: &cancellables)
+        
+        tts.$isSpeaking.sink { [weak self] b in
+            self?.isSpeaking = b
         }.store(in: &cancellables)
         
         stt.locale = settings.mainLocale
