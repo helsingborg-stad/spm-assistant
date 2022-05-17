@@ -302,6 +302,12 @@ public class Assistant<Keys: NLKeyDefinition> : ObservableObject {
         }
         return arr
     }
+    
+    /// Cancells all currently running speech services, ie TTS or STT.
+    public func cancelSpeechServices() {
+        taskQueue.clear()
+    }
+    
     /// Listen (from STT result) for a set of key
     /// - Parameter keys: keys (or rather their acompaning values) to listen for
     /// - Returns: publisher triggered when a user utterance triggers one or more keys
