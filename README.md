@@ -1,4 +1,8 @@
 # Assistant
+## DEPRECATED
+Package will not recieve any updates, please use the Assistant library in https://github.com/helsingborg-stad/spm-daisy instead.
+
+## About
 A package that manages voice commands, text to speech, translations and localized strings. It also makes sure that TTS and STT is not interfering with each other, especially important when using a shared device without a headset.
 
 ## Setup
